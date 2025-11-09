@@ -2,15 +2,19 @@
 
 A fully functional multi-channel AI-driven conversational sales platform using Google Gemini for agent orchestration.
 
-## Features
+A fully functional multi-channel AI-driven conversational sales platform using Google Gemini for agent orchestration. Experience intelligent product recommendations, real-time cart management, and seamless checkout with an AI assistant that understands natural language.
 
-- 🤖 **AI-Powered Chat Assistant** - Natural language product search and recommendations
-- 🛒 **Smart Shopping Cart** - Real-time cart management with loyalty discounts
-- 💳 **Seamless Checkout** - Multiple payment and fulfillment options
-- 🎯 **Agent Orchestration** - Multi-agent workflow with parallel processing
-- 🏆 **Loyalty Program** - Tier-based discounts (Silver/Gold/Platinum)
-- 📦 **Flexible Fulfillment** - Ship to Home, Click & Collect, In-Store Try-on
-- 📱 **Responsive Design** - Mobile-first, works on all devices
+## ✨ Features
+
+- 🤖 **AI-Powered Chat Assistant** - Natural language product search and recommendations with compact, optimized display
+- 🛒 **Smart Shopping Cart** - Real-time cart management with automatic session handling and loyalty discounts
+- 💳 **Seamless Checkout** - Multiple payment and fulfillment options with detailed order confirmation
+- 🎯 **Agent Orchestration** - Multi-agent workflow with parallel processing for optimal performance
+- 🏆 **Loyalty Program** - Tier-based discounts (Silver 10%/Gold 15%/Platinum 20%)
+- 📦 **Flexible Fulfillment** - Ship to Home (2-day delivery), Click & Collect (same day), In-Store Try-on
+- 📱 **Responsive Design** - Mobile-first, works flawlessly on all devices
+- 🖨️ **Print-Ready Receipts** - Professional order confirmations with printable receipts
+- 🔄 **Auto-Session Management** - Automatic session creation and cart synchronization
 
 ## Tech Stack
 
@@ -31,16 +35,17 @@ A fully functional multi-channel AI-driven conversational sales platform using G
 ## Quick Start
 
 ### Prerequisites
-- Python 3.11+
+- Python 3.13+ (or 3.11+)
 - Node.js 18+
-- PostgreSQL 15+
-- Redis 7+
-- Google Gemini API Key
+- PostgreSQL 15+ (optional - for production)
+- Redis 7+ (optional - falls back to in-memory storage)
+- Google Gemini API Key ([Get yours here](https://ai.google.dev/))
 
 ### 1. Clone and Setup
 
 ```bash
-cd /home/sam/Documents/retailP
+git clone https://github.com/sg6724/RetailAgenticAI.git
+cd RetailAgenticAI
 ```
 
 ### 2. Backend Setup
@@ -114,11 +119,16 @@ Open your browser and navigate to: **http://localhost:5173**
 
 ### Backend (.env)
 ```env
+# Required
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# Optional (defaults provided)
 DATABASE_URL=postgresql://postgres:password@localhost:5432/retail_db
 REDIS_URL=redis://localhost:6379/0
-GOOGLE_API_KEY=your_gemini_api_key_here
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
 ```
+
+> **Note:** Redis is optional - the application will automatically fall back to in-memory storage if Redis is not available.
 
 ### Frontend (.env)
 ```env
@@ -145,14 +155,22 @@ VITE_API_URL=http://localhost:8000
 ### 4. Checkout
 - Click "Proceed to Checkout"
 - Choose delivery option (Ship/Collect/Try-on)
-- Select payment method
-- Apply coupons if available
+- Select payment method (UPI/Card/Wallet)
+- Apply available coupons
+- Verify payment details
 - Complete purchase
 
-### 5. Loyalty Benefits
-- Automatic tier-based discounts
+### 5. Order Confirmation
+- View order details with estimated delivery date
+- Print professional receipt
+- Track order status
+- See loyalty points earned
+
+### 6. Loyalty Benefits
+- Automatic tier-based discounts (10-20% off)
 - Earn points on every purchase
 - Access exclusive coupons
+- Points-based tier progression
 
 ## Demo Scenarios
 
@@ -178,10 +196,11 @@ User: "Show me similar but in red"
 AI: Updates results with red jackets
 ```
 
-## API Endpoints
+## 🔌 API Endpoints
 
 ### Chat
 - `POST /api/chat` - Send message to AI assistant
+- `WS /ws/chat` - WebSocket for real-time chat (available but not used)
 
 ### Products
 - `GET /api/products` - Get products with filters
@@ -189,15 +208,20 @@ AI: Updates results with red jackets
 - `GET /api/products/search/{query}` - Search products
 
 ### Cart
-- `POST /api/cart/add` - Add item to cart
+- `POST /api/cart/add` - Add item to cart (auto-creates session)
 - `GET /api/cart/{session_id}` - Get cart contents
 - `DELETE /api/cart/{session_id}/item/{product_id}` - Remove item
 
 ### Checkout
-- `POST /api/checkout` - Process checkout
+- `POST /api/checkout` - Process checkout and create order
 
 ### Loyalty
-- `GET /api/loyalty/{customer_id}` - Get loyalty info
+- `GET /api/loyalty/{customer_id}` - Get loyalty info and coupons
+
+### Recommendations
+- `GET /api/recommendations/related` - Get related products
+- `GET /api/recommendations/frequently-bought/{product_id}` - Frequently bought together
+- `GET /api/recommendations/complete-look` - Complete the look suggestions
 
 ## Architecture
 
@@ -299,6 +323,19 @@ lsof -ti:5173 | xargs kill -9
 **API connection error:**
 - Check backend is running on port 8000
 - Verify VITE_API_URL in .env
+- Check browser console for detailed error logs
+
+**Python 3.13 compatibility issues:**
+```bash
+# Update dependencies to latest versions
+cd backend
+pip install --upgrade pydantic fastapi uvicorn
+```
+
+**Checkout redirects to home page:**
+- Check browser console for error logs
+- Verify session is being created (check backend logs)
+- Ensure cart has items before checkout
 
 ## Testing
 
@@ -329,25 +366,76 @@ lsof -ti:5173 | xargs kill -9
 - Input validation with Pydantic
 - SQL injection prevention with SQLAlchemy ORM
 
-## Future Enhancements
+## 🎯 Future Enhancements
 
-- [ ] Real payment gateway integration
-- [ ] Email notifications
-- [ ] Order tracking
-- [ ] Product reviews and ratings
+### High Priority
+- [ ] Real payment gateway integration (Razorpay/Stripe)
+- [ ] Email/SMS notifications for orders
+- [ ] Real-time order tracking
+- [ ] Product reviews and ratings system
+- [ ] Advanced search filters (size, color, brand)
+
+### Medium Priority
 - [ ] Wishlist functionality
-- [ ] Voice search
-- [ ] Multi-language support
+- [ ] Voice search integration
+- [ ] Save cart for later
+- [ ] Product comparison feature
+- [ ] Recently viewed products
+
+### Long Term
+- [ ] Multi-language support (Hindi, regional languages)
 - [ ] Advanced analytics dashboard
+- [ ] Inventory management system
+- [ ] Vendor/seller portal
+- [ ] Mobile app (React Native)
 
-## License
+## 📜 License
 
-MIT License
+MIT License - feel free to use this project for learning and development!
 
-## Support
+## 👥 Contributors
 
-For issues or questions, please open an issue on the repository or contact the development team.
+- **Samriddhi Gupta** ([@sg6724](https://github.com/sg6724))
+- **Jainam Oswal** ([@JainamOswal18](https://github.com/JainamOswal18))
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request. For major changes:
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 💬 Support
+
+- 🐛 **Bug Reports:** [Open an issue](https://github.com/sg6724/RetailAgenticAI/issues)
+- 💡 **Feature Requests:** [Open an issue](https://github.com/sg6724/RetailAgenticAI/issues)
+- 📧 **Contact:** Open an issue or reach out to contributors
+
+## ⭐ Show Your Support
+
+Give a ⭐️ if this project helped you learn about AI agents and e-commerce platforms!
+
+## 📝 Changelog
+
+### Version 1.1.0 (Current)
+- Enhanced order confirmation with smart delivery dates
+- Improved chat product display
+- Auto-session management
+- Python 3.13 support
+- Multiple bug fixes and improvements
+
+### Version 1.0.0
+- Initial release
+- Multi-agent orchestration
+- AI-powered chat
+- Cart and checkout functionality
+- Loyalty program
 
 ---
 
-Built with ❤️ using Google Gemini AI
+**Built with ❤️ using Google Gemini AI**
+
+*Last Updated: November 2025*
