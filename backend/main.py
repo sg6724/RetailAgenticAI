@@ -196,7 +196,17 @@ async def add_to_cart(session_id: str, item: CartItem):
     try:
         session_data = redis_manager.get_session(session_id)
         if not session_data:
-            raise HTTPException(status_code=404, detail="Session not found")
+            # Initialize session if it doesn't exist
+            session_data = {
+                "session_id": session_id,
+                "customer_id": f"GUEST_{session_id[:8]}",
+                "conversation_history": [],
+                "active_cart": {"items": [], "subtotal": 0},
+                "context": {},
+                "last_updated": datetime.now().isoformat(),
+                "ttl": 86400
+            }
+            redis_manager.set_session(session_id, session_data)
         
         cart = session_data.get("active_cart", {"items": [], "subtotal": 0})
         
@@ -217,6 +227,9 @@ async def add_to_cart(session_id: str, item: CartItem):
         
         session_data["active_cart"] = cart
         redis_manager.set_session(session_id, session_data)
+        
+        # Debug logging
+        print(f"✅ Added to cart - Session: {session_id}, Total items: {len(cart['items'])}, Subtotal: ₹{cart['subtotal']}")
         
         return {"success": True, "cart": cart}
     
@@ -271,11 +284,29 @@ async def checkout(order_request: OrderRequest):
     try:
         session_data = redis_manager.get_session(order_request.session_id)
         if not session_data:
-            raise HTTPException(status_code=404, detail="Session not found")
+            # Initialize session if it doesn't exist (e.g., user went directly to checkout)
+            session_data = {
+                "session_id": order_request.session_id,
+                "customer_id": order_request.customer_id,
+                "conversation_history": [],
+                "active_cart": {"items": [], "subtotal": 0},
+                "context": {},
+                "last_updated": datetime.now().isoformat(),
+                "ttl": 86400
+            }
+            redis_manager.set_session(order_request.session_id, session_data)
         
+        # Get cart from session
         cart = session_data.get("active_cart", {"items": [], "subtotal": 0})
+        
+        # Debug logging
+        print(f"🛒 Checkout - Session: {order_request.session_id}, Cart items: {len(cart['items'])}")
+        
         if not cart["items"]:
-            raise HTTPException(status_code=400, detail="Cart is empty")
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Cart is empty. Please add items before checkout. Session: {order_request.session_id}"
+            )
         
         # Calculate final pricing with loyalty
         pricing = loyalty_api.calculate_final_pricing(
@@ -298,12 +329,23 @@ async def checkout(order_request: OrderRequest):
         # Generate order ID
         order_id = payment_result["transaction_id"].replace("TXN", "ORD")
         
+        # Calculate estimated delivery date
+        from datetime import timedelta
+        if order_request.fulfillment_option.value == "Ship to Home":
+            delivery_date = datetime.now() + timedelta(days=2)
+            estimated_delivery = delivery_date.strftime("%A, %B %d, %Y")  # e.g., "Monday, January 15, 2024"
+        elif order_request.fulfillment_option.value == "Click & Collect":
+            delivery_date = datetime.now()
+            estimated_delivery = "Ready today at " + delivery_date.strftime("%I:%M %p")
+        else:  # In-Store Try-on
+            estimated_delivery = "Visit anytime during store hours"
+        
         # Prepare fulfillment details
         fulfillment_details = {
             "type": order_request.fulfillment_option.value,
             "delivery_address": order_request.delivery_address,
             "store_location": order_request.store_location,
-            "estimated_delivery": "2-3 days" if order_request.fulfillment_option.value == "Ship to Home" else "Same day"
+            "estimated_delivery": estimated_delivery
         }
         
         # Add loyalty points
@@ -322,6 +364,10 @@ async def checkout(order_request: OrderRequest):
             "estimated_delivery": fulfillment_details["estimated_delivery"],
             "timestamp": datetime.now().isoformat()
         }
+        
+        # Debug logging
+        print(f"✅ Order placed successfully - Order ID: {order_id}, Amount: ₹{pricing['final_amount']:.2f}")
+        print(f"📦 Estimated delivery: {fulfillment_details['estimated_delivery']}")
         
         return {"success": True, "order": order_confirmation}
     

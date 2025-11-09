@@ -108,6 +108,13 @@ export const Checkout: React.FC = () => {
     setIsProcessing(true);
 
     try {
+      console.log('🛒 Starting checkout with:', {
+        session_id: sessionId,
+        customer_id: customerId,
+        payment_method: paymentMethod,
+        fulfillment_option: fulfillmentOption,
+      });
+
       const response = await checkoutAPI({
         session_id: sessionId,
         customer_id: customerId,
@@ -117,13 +124,31 @@ export const Checkout: React.FC = () => {
         store_location: fulfillmentOption !== 'Ship to Home' ? storeLocation : undefined,
       });
 
-      if (response.success) {
-        clearCart();
-        navigate('/confirmation', { state: { order: response.order } });
+      console.log('✅ Checkout response:', response);
+
+      if (response.success && response.order) {
+        console.log('📦 Order data:', response.order);
+        console.log('🚀 Navigating to confirmation page...');
+
+        // Navigate FIRST, then clear cart
+        // This ensures the order data is passed before any re-renders
+        navigate('/confirmation', {
+          state: { order: response.order },
+          replace: true
+        });
+
+        // Clear cart after a short delay to ensure navigation happens first
+        setTimeout(() => {
+          clearCart();
+        }, 100);
+      } else {
+        console.error('❌ No order data in response:', response);
+        alert('Order was not created properly. Please try again.');
       }
-    } catch (error) {
-      console.error('Checkout error:', error);
-      alert('Checkout failed. Please try again.');
+    } catch (error: any) {
+      console.error('❌ Checkout error:', error);
+      console.error('Error details:', error.response?.data || error.message);
+      alert(`Checkout failed: ${error.response?.data?.detail || error.message}`);
     } finally {
       setIsProcessing(false);
     }
