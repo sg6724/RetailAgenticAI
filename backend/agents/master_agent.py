@@ -30,8 +30,6 @@ class MasterAgent:
     async def process_query(self, user_message: str, session_id: Optional[str] = None, customer_id: Optional[str] = None) -> Dict:
         """Main orchestration method"""
         try:
-            print(f"\n🤖 Master Agent Processing: '{user_message}'")
-            
             # Generate or retrieve session
             if not session_id:
                 session_id = str(uuid.uuid4())
@@ -41,12 +39,10 @@ class MasterAgent:
             if not session_data:
                 session_data = self._initialize_session(session_id, customer_id)
             
-            # Step 1: Intent Recognition using Gemini
-            print(f"📊 Step 1: Analyzing intent with Gemini...")
+            # Step 1: Intent Recognition
             intent_data = analyze_intent(user_message)
             intent = intent_data.get("intent", "product_search")
             entities = intent_data.get("entities", {})
-            print(f"✓ Intent: {intent}, Entities: {entities}")
             
             # Step 2: Update context with new information
             context = self._build_context(session_data, user_message, intent, entities, customer_id)
@@ -57,10 +53,8 @@ class MasterAgent:
             # Step 4: Response Aggregation
             aggregated_response = self._aggregate_responses(agent_results, context)
             
-            # Step 5: Natural Language Generation using Gemini
-            print(f"💬 Step 5: Generating natural response with Gemini...")
+            # Step 5: Natural Language Generation
             natural_response = self._generate_response(aggregated_response, context, intent)
-            print(f"✓ Response generated: {natural_response['message'][:100]}...")
             
             # Step 6: Update Session State
             self._update_session(session_id, user_message, natural_response, context, aggregated_response)
@@ -214,19 +208,44 @@ class MasterAgent:
         return aggregated
     
     def _generate_response(self, aggregated: Dict, context: Dict, intent: str) -> Dict:
-        """Generate natural language response"""
+        """Generate natural language response using Gemini"""
+        # Prepare context for Gemini
+        gemini_context = {
+            "intent": intent,
+            "user_message": context.get("user_message"),
+            "customer_id": context.get("customer_id"),
+            "aggregated_data": aggregated,
+            "conversation_history": context.get("conversation_history", [])[-3:]  # Last 3 messages
+        }
         
-        # Build response based on intent
-        if intent == "product_search" or intent == "product_details":
-            return self._generate_product_response(aggregated, context)
-        elif intent == "checkout":
-            return self._generate_checkout_response(aggregated, context)
-        elif intent == "order_status":
-            return self._generate_order_status_response(aggregated, context)
-        elif intent == "support":
-            return self._generate_support_response(aggregated, context)
-        else:
-            return self._generate_general_response(aggregated, context)
+        # Generate natural response using Gemini
+        try:
+            natural_message = generate_natural_response(gemini_context)
+        except Exception as e:
+            print(f"Gemini generation error: {e}")
+            # Fallback to intent-based responses
+            if intent == "product_search":
+                return self._generate_product_response(aggregated, context)
+            elif intent == "checkout":
+                return self._generate_checkout_response(aggregated, context)
+            elif intent == "order_status":
+                return self._generate_order_status_response(aggregated, context)
+            elif intent == "support":
+                return self._generate_support_response(aggregated, context)
+            else:
+                return self._generate_general_response(aggregated, context)
+        
+        # Return response with Gemini-generated message
+        response = {
+            "message": natural_message,
+            "products": aggregated.get("products"),
+            "pricing": aggregated.get("pricing"),
+            "fulfillment_options": aggregated.get("fulfillment_options"),
+            "payment_methods": aggregated.get("payment_methods"),
+            "loyalty_info": aggregated.get("loyalty_info"),
+        }
+        
+        return response
     
     def _generate_product_response(self, aggregated: Dict, context: Dict) -> Dict:
         """Generate response for product search"""

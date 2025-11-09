@@ -4,47 +4,48 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# Configure Gemini with API key
-if GEMINI_API_KEY and GEMINI_API_KEY != "your_api_key_here":
+if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    print(f"✓ Gemini API configured successfully")
-else:
-    print(f"⚠️  WARNING: Gemini API key not configured! Please set GEMINI_API_KEY in backend/.env")
 
 
-def get_gemini_model(model_name: str = "gemini-2.0-flash-exp"):
+def get_gemini_model(model_name: str = "gemini-2.5-flash"):
     """Get configured Gemini model"""
-    if not GEMINI_API_KEY or GEMINI_API_KEY == "your_api_key_here":
-        raise Exception("Gemini API key not configured")
+    if not GEMINI_API_KEY:
+        print("⚠️  Warning: GEMINI_API_KEY not set. AI responses will be limited.")
+        return None
     
     try:
-        # Try the requested model first
+        # Try Gemini 2.0 Flash first
         model = genai.GenerativeModel(model_name)
         print(f"✓ Using Gemini model: {model_name}")
         return model
     except Exception as e:
-        print(f"⚠️  Error with {model_name}: {e}")
-        # Fallback to stable version
+        print(f"Error with {model_name}: {e}")
         try:
-            fallback_model = "gemini-1.5-flash"
+            # Fallback to Gemini 1.5 Flash
+            fallback_model = "gemini-2.5-flash"
             model = genai.GenerativeModel(fallback_model)
-            print(f"✓ Fallback to: {fallback_model}")
+            print(f"✓ Using fallback model: {fallback_model}")
             return model
         except Exception as e2:
-            print(f"❌ Error with fallback model: {e2}")
-            raise
+            print(f"Error with fallback model: {e2}")
+            return None
 
 
-def generate_response(prompt: str, model_name: str = "gemini-2.5-flash") -> str:
+def generate_response(prompt: str, model_name: str = "gemini-2.0-flash-exp") -> str:
     """Generate response from Gemini"""
     try:
         model = get_gemini_model(model_name)
+        if not model:
+            return "I apologize, but I'm having trouble connecting to the AI service. Please check your API key configuration."
+        
         response = model.generate_content(prompt)
         return response.text
     except Exception as e:
         print(f"Error generating response: {e}")
+        print(f"Prompt was: {prompt[:200]}...")
         return "I apologize, but I'm having trouble processing your request right now. Please try again."
 
 
@@ -88,18 +89,52 @@ Return only valid JSON, no additional text."""
 
 def generate_natural_response(context: dict) -> str:
     """Generate natural language response based on context"""
-    prompt = f"""You are a friendly, helpful retail sales assistant. Generate a natural, conversational response based on this context:
+    
+    intent = context.get("intent", "general")
+    user_message = context.get("user_message", "")
+    aggregated_data = context.get("aggregated_data", {})
+    products = aggregated_data.get("products", [])
+    pricing = aggregated_data.get("pricing")
+    loyalty_info = aggregated_data.get("loyalty_info")
+    
+    # Build detailed context for Gemini
+    context_details = f"""You are an enthusiastic AI retail sales assistant helping a customer shop online.
 
-Context: {context}
+USER'S MESSAGE: "{user_message}"
+INTENT: {intent}
 
-Guidelines:
-- Be warm and enthusiastic
-- Use emojis sparingly (1-2 per response)
-- Keep responses concise (2-4 sentences)
-- Highlight key information like prices, discounts, availability
-- End with a clear call-to-action or question
-- Use Indian Rupee symbol (₹) for prices
+"""
+    
+    if products:
+        context_details += f"\nPRODUCTS FOUND ({len(products)} items):\n"
+        for i, p in enumerate(products[:5], 1):
+            context_details += f"{i}. {p['name']} - ₹{p['price']:,.0f} ({p['rating']}⭐) - {p['brand']}\n"
+    
+    if pricing:
+        context_details += f"\nPRICING DETAILS:\n"
+        context_details += f"- Subtotal: ₹{pricing['subtotal']:,.2f}\n"
+        context_details += f"- Discount: ₹{pricing.get('savings', 0):,.2f}\n"
+        context_details += f"- Final Amount: ₹{pricing['final_amount']:,.2f}\n"
+    
+    if loyalty_info:
+        context_details += f"\nLOYALTY INFO:\n"
+        context_details += f"- Tier: {loyalty_info.get('tier', 'Silver')}\n"
+        context_details += f"- Points: {loyalty_info.get('points', 0)}\n"
+    
+    prompt = f"""{context_details}
 
-Generate only the response text, no additional formatting."""
+TASK: Generate a natural, conversational response as a friendly sales assistant.
+
+GUIDELINES:
+- Be warm, enthusiastic, and helpful
+- Use 1-2 emojis maximum
+- Keep it concise (2-4 sentences)
+- Mention specific product names, prices, and key features
+- Highlight discounts and savings if applicable
+- End with a clear call-to-action or helpful question
+- Use Indian Rupee symbol (₹) for all prices
+- Sound natural and human-like, not robotic
+
+Generate ONLY the response message, no additional text or formatting:"""
 
     return generate_response(prompt)
